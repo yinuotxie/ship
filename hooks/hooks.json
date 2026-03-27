@@ -1,0 +1,15 @@
+{
+  "description": "Ship plugin hooks — quality gate on session exit",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/stop-gate.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
