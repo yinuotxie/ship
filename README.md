@@ -2,29 +2,6 @@
 
 Ship is a plugin for Claude Code that orchestrates end-to-end software development — from planning through implementation, review, QA, and PR creation — with quality gates at every transition.
 
-## Core Philosophy
-
-- **Orchestrator pattern** — a read-only orchestrator delegates every phase to fresh subagents with isolated context, preserving the coordination window for decisions that matter
-- **Adversarial planning** — plans are stress-tested through independent Codex challenger rounds before any code is written
-- **Evidence over claims** — every phase produces artifacts on disk; quality gates verify artifacts exist and pass before advancing
-- **Test-driven development** — implementation follows a RED-GREEN-REFACTOR cycle with per-story code review
-
-## Skills
-
-| Skill | Description |
-|-------|-------------|
-| `/ship:auto` | Full 9-phase coding pipeline: design → implement → review → verify → QA → simplify → PR |
-| `/ship:plan` | Adversarial pre-coding planning with Codex challenger (2-round convergence) |
-| `/ship:implement` | Per-story implementation with TDD, code review, and targeted fix loops |
-| `/ship:debug` | Root cause investigation and targeted repair for unknown failures |
-| `/ship:refactor` | Behavior-preserving code cleanup with baseline comparison |
-| `/ship:qa` | Independent QA evaluation: functional, exploratory, and health testing with L1 evidence |
-| `/ship:handoff` | PR creation with proof bundle, CI fix loop, and review comment resolution |
-| `/ship:setup` | Bootstrap a repo from zero to AI-ready (linters, formatters, CI/CD, AGENTS.md) |
-| `/ship:review` | Review code for bugs, security issues, and best practices |
-| `/ship:test` | Write and run tests for code changes |
-| `/ship:clean` | Clean up dead code, unused imports, and unnecessary complexity |
-
 ## How It Works
 
 Ship is a harness, not a copilot. It doesn't help AI write code — it constrains AI to produce reliable results through mechanically enforced quality gates.
@@ -44,6 +21,13 @@ Ship is a harness, not a copilot. It doesn't help AI write code — it constrain
 **The finish line is a merge-ready PR, not a PR.** After creating the PR with a proof bundle, Ship enters a fix loop: wait for CI, read failure logs, dispatch fixes, address review comments, resolve merge conflicts — up to 2 rounds before escalating. PR creation is the midpoint, not the end.
 
 You describe what you want to build. Ship handles the constraints that make AI output trustworthy.
+
+## Core Philosophy
+
+- **Orchestrator pattern** — a read-only orchestrator delegates every phase to fresh subagents with isolated context, preserving the coordination window for decisions that matter
+- **Adversarial planning** — plans are stress-tested through independent Codex challenger rounds before any code is written
+- **Evidence over claims** — every phase produces artifacts on disk; quality gates verify artifacts exist and pass before advancing
+- **Test-driven development** — implementation follows a RED-GREEN-REFACTOR cycle with per-story code review
 
 ## The Basic Workflow
 
@@ -66,6 +50,22 @@ You describe what you want to build. Ship handles the constraints that make AI o
 **refactor** — Captures behavioral baseline first, then refactors in small incremental steps. Every step must pass existing tests before moving on. Review focuses specifically on behavior preservation, not just code quality.
 
 Skills trigger automatically based on what you're doing. The harness enforces the workflow — you don't need to remember the process.
+
+## Skills
+
+| Skill | Description |
+|-------|-------------|
+| `/ship:auto` | Full 9-phase coding pipeline: design → implement → review → verify → QA → simplify → PR |
+| `/ship:plan` | Adversarial pre-coding planning with Codex challenger (2-round convergence) |
+| `/ship:implement` | Per-story implementation with TDD, code review, and targeted fix loops |
+| `/ship:debug` | Root cause investigation and targeted repair for unknown failures |
+| `/ship:refactor` | Behavior-preserving code cleanup with baseline comparison |
+| `/ship:qa` | Independent QA evaluation: functional, exploratory, and health testing with L1 evidence |
+| `/ship:handoff` | PR creation with proof bundle, CI fix loop, and review comment resolution |
+| `/ship:setup` | Bootstrap a repo from zero to AI-ready (linters, formatters, CI/CD, AGENTS.md) |
+| `/ship:review` | Review code for bugs, security issues, and best practices |
+| `/ship:test` | Write and run tests for code changes |
+| `/ship:clean` | Clean up dead code, unused imports, and unnecessary complexity |
 
 ## Installation
 
