@@ -443,6 +443,42 @@ Commit: `chore: set up CI/CD (GitHub Actions, Dependabot, auto-labeler)`
 
 ---
 
+## Phase 2.5: Policy Generation
+
+Generate `.ship/ship.policy.json` if it does not already exist.
+
+**Idempotency:** If `.ship/ship.policy.json` already exists, skip this phase entirely.
+
+1. Read the default template from `${CLAUDE_PLUGIN_ROOT}/skills/setup/templates/ship.policy.json`
+2. Copy it to `.ship/ship.policy.json`
+3. Fill in `quality.pre_commit` based on languages detected in Phase 1:
+
+| Language | pre_commit entries |
+|----------|-------------------|
+| TypeScript | `{"command": "npm test", "name": "tests"}`, `{"command": "npm run lint", "name": "linter"}` |
+| Python | `{"command": "pytest", "name": "tests"}`, `{"command": "ruff check .", "name": "linter"}` |
+| Go | `{"command": "go test ./...", "name": "tests"}`, `{"command": "go vet ./...", "name": "vet"}` |
+| Rust | `{"command": "cargo test", "name": "tests"}`, `{"command": "cargo clippy", "name": "clippy"}` |
+
+Use `jq` to update the `quality.pre_commit` array in the generated file.
+Only add entries for languages actually detected — don't add Python commands to a TypeScript-only repo.
+
+4. Fill in `quality.require_tests.source_patterns` and `test_patterns`:
+
+| Language | source_patterns | test_patterns |
+|----------|----------------|---------------|
+| TypeScript | `["src/**/*.ts", "!src/**/*.d.ts"]` | `["**/*.test.ts", "**/*.spec.ts"]` |
+| Python | `["src/**/*.py", "!src/**/__init__.py"]` | `["tests/**/*.py", "**/test_*.py"]` |
+| Go | `["**/*.go", "!**/*_test.go"]` | `["**/*_test.go"]` |
+
+5. Update `.gitignore` to track policy but ignore ephemeral files:
+   - Remove `.ship/` if present (broad ignore)
+   - Add `.ship/tasks/` and `.ship/audit/` (narrow ignores)
+
+6. Commit: `feat(policy): generate default policy for AI guardrails`
+
+---
+
 ## Phase 3: Verify
 
 Confirm each installed tool **can run** — not that all code passes lint.
