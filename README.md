@@ -74,13 +74,13 @@ Skills trigger automatically based on what you're doing. The harness enforces th
 Register the marketplace first:
 
 ```
-/plugin marketplace add tryship/shipx
+/plugin marketplace add tryship/ship
 ```
 
 Then install the plugin:
 
 ```
-/plugin install ship@shipx
+/plugin install ship@ship
 ```
 
 ### Local Development
@@ -88,8 +88,8 @@ Then install the plugin:
 Clone the repo and point Claude Code at it:
 
 ```bash
-git clone https://github.com/tryship/shipx.git
-claude --plugin-dir ./shipx
+git clone https://github.com/tryship/ship.git
+claude --plugin-dir ./ship
 ```
 
 ### Verify Installation
@@ -105,4 +105,4 @@ Open a fresh session and give it a task that would trigger a skill — for examp
 ## Links
 
 - Website: https://ship.tech
-- Repository: https://github.com/tryship/shipx
+- Repository: https://github.com/tryship/ship
