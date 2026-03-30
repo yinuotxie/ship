@@ -219,8 +219,15 @@ if echo "$COMMAND" | grep -qE '^git commit\b|;\s*git commit\b|&&\s*git commit\b'
       [ -z "$check_entry" ] && continue
       CHECK_COUNT=$((CHECK_COUNT + 1))
 
-      check_cmd=$(jq -r '.command // empty' <<<"$check_entry" 2>/dev/null)
-      check_name=$(jq -r '.name // "unnamed check"' <<<"$check_entry" 2>/dev/null)
+      # Support both object format {"command":"...", "name":"..."} and plain string "..."
+      entry_type=$(jq -r 'type' <<<"$check_entry" 2>/dev/null)
+      if [ "$entry_type" = "string" ]; then
+        check_cmd=$(jq -r '.' <<<"$check_entry" 2>/dev/null)
+        check_name="$check_cmd"
+      else
+        check_cmd=$(jq -r '.command // empty' <<<"$check_entry" 2>/dev/null)
+        check_name=$(jq -r '.name // "unnamed check"' <<<"$check_entry" 2>/dev/null)
+      fi
       [ -z "$check_cmd" ] && continue
 
       # Run the pre-commit check from the repo root
