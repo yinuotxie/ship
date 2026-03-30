@@ -14,14 +14,13 @@ Purpose: Generate GitHub Actions CI workflow, Dependabot config, and auto-labele
 
 ### 2. Generate CI Workflow
 
-- Read the language-specific templates from `templates/`:
-  - `ci-node.yml`
-  - `ci-python.yml`
-  - `ci-go.yml`
-- If the repo is multi-language, combine jobs into one `.github/workflows/ci.yml`.
-- For other languages without a template, generate a workflow job from the Phase 1 detected commands.
-- Replace placeholders with the actual detected commands for install, lint, format, typecheck, and test steps.
-- Write the result to `.github/workflows/ci.yml`.
+Generate `.github/workflows/ci.yml` dynamically from Phase 1 detection results:
+
+- For each detected language, create a job with steps for: install deps, lint, format check, typecheck (if applicable), and test.
+- Use the actual commands detected in Phase 1 (or installed in the tooling module). Do not hardcode commands.
+- Use the standard `actions/setup-*` actions for each language runtime (e.g., `actions/setup-node@v4`, `actions/setup-python@v5`, `actions/setup-go@v5`).
+- If the repo is multi-language, combine jobs into one workflow file.
+- Reference `references/toolchain-matrix.md` for the verify commands per tool.
 
 ### 3. Generate Dependabot
 
