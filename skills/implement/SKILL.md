@@ -1,42 +1,35 @@
 ---
 name: implement
-version: 0.4.0
-description: "Use when executing implementation stories from a plan. Codex implements each story, Claude reviews code quality, spec compliance, and convention compliance. Independent stories may be parallelized."
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Agent
-  - AskUserQuestion
-  - TaskCreate
-  - TaskUpdate
+description: "Use when executing implementation stories from a plan. Codex implements each story, Claude reviews spec compliance and code correctness. Stories run sequentially."
 ---
 
 # Ship: Implement
 
 Execute implementation stories from a plan. Each story: codex implements
-with TDD, claude reviews code quality + spec compliance + convention
-compliance, targeted fix on failure. Stories run sequentially by default;
-independent stories may be parallelized.
+with TDD, claude reviews spec compliance + code correctness, targeted
+fix on failure. Stories run sequentially; review must pass before the
+next story starts.
 
-## Hard Rules — What You Must NOT Do
+**Why separation of concerns:** You are the orchestrator — you never
+write code, read diffs, or run tests. This buys three things:
+1. **Context isolation** — codex implements with only the story context
+   it needs, no session history to confuse it. A fresh reviewer judges
+   each story without accumulated leniency from prior reviews.
+2. **Preserved orchestrator context** — your context window stays clean
+   for coordination, not filled with diffs and test output.
+3. **Honest verification** — the reviewer never saw the implementation
+   happen, so it cannot rationalize away problems it watched being built.
 
-1. **You do NOT write code.** All implementation goes through `codex exec --full-auto`.
-   If codex is unavailable, report BLOCKED — do not implement yourself.
-2. **You do NOT review code yourself.** All reviews go through a fresh `Agent` tool
-   dispatch. Reading the diff yourself biases judgment — dispatch a reviewer who
-   has never seen the implementation context.
-3. **You do NOT run tests to "quickly check".** Tests are run by codex (during
-   implementation) and by the reviewer agent (during review).
-
-If you catch yourself writing code, reading diffs, or running tests directly,
-STOP — you are violating the separation of concerns that makes this pipeline reliable.
+**Core principle:** Codex implements → structured one-pass review under
+the Verification Principle (every finding must include file:line +
+reproducible evidence, or it is not a valid finding) → targeted fix on
+failure. No parallelism between stories, no skipping the review gate.
 
 ## Checklist
 
 You MUST create a task for each of these steps and complete them in order:
 
-1. **Read spec + plan** — read spec.md for acceptance criteria, plan.md for stories
+1. **Read spec + plan** — locate acceptance criteria and implementation stories (see Input)
 2. **Detect tooling** — find test command, extract code conduct from CLAUDE.md/AGENTS.md
 3. **Per-story loop** — for each story: record start SHA → codex implements → record end SHA → verify commit exists → reviewer checks → verdict
 4. **Cross-story regression** — run full test suite after all stories pass
@@ -45,15 +38,6 @@ You MUST create a task for each of these steps and complete them in order:
 Mark each task in_progress when starting, completed when done.
 
 ---
-
-## Design Principles
-
-1. **Fresh Reviewer** — Dispatch a new Reviewer agent per review. Never
-   reuse a prior Reviewer — accumulated context biases judgment.
-2. **Fix Forward** — On FAIL, dispatch a targeted fix for the specific
-   issues found. Never re-implement the entire story.
-3. **Investigate First** — When codex reports NEEDS_CONTEXT or uncertainty,
-   provide context or break the story smaller. Never force codex to guess.
 
 ## Team Composition
 
@@ -74,20 +58,34 @@ Mark each task in_progress when starting, completed when done.
 
 ## Input
 
-The caller provides a task directory path containing:
-- `plan/spec.md` — acceptance criteria and requirements
-- `plan/plan.md` — ordered implementation stories
+The skill needs two things to operate:
+- **Acceptance criteria** — what "done" looks like (from a spec file,
+  or derived from the user's request)
+- **Implementation stories** — ordered steps (from a plan file, or
+  a single story for small tasks)
 
-If invoked standalone (no task dir from caller), use AskUserQuestion to
-prompt the user for a task dir or spec + plan paths.
+### Locating input
+
+1. **Caller provides paths** → use them directly.
+2. **Caller provides a task directory** → look for spec/plan files inside.
+3. **No formal plan or spec exists** → investigate first:
+   - Read the user's request and relevant source files
+   - Derive a concrete list of acceptance criteria
+   - Present the criteria to the user via AskUserQuestion for confirmation
+   - Break the work into stories if it touches multiple files or concerns;
+     keep it as a single story only if it is truly atomic
+
+   Do not ask the user to write a plan. Derive what you need from context.
 
 ## Process
 
-1. Read `plan/spec.md` — this is the acceptance criteria reference.
-2. Read `plan/plan.md` — extract all implementation step sections.
-   Accept any heading format: `## Story N`, `## Step N`, `## N. Title`,
-   or numbered/bulleted lists of implementation steps. Normalize them as
-   ordered stories for the loop.
+1. Read the **acceptance criteria** (from spec file, or derived per
+   Input section above). This is the reference for the reviewer's
+   spec checklist.
+2. Read the **implementation stories** (from plan file, or single story
+   for small tasks). Accept any heading format: `## Story N`,
+   `## Step N`, `## N. Title`, or numbered/bulleted lists. Normalize
+   them as ordered stories for the loop.
 3. Detect the repo's test command by inspecting the project root:
    - `Makefile` → `make test`
    - `package.json` → `npm test` or `pnpm test` or `yarn test`
@@ -111,8 +109,8 @@ prompt the user for a task dir or spec + plan paths.
    `CODE_CONDUCT`.
 5. Create a task for each story via TaskCreate. Mark in_progress when
    starting, completed when review passes.
-6. Run the per-story loop sequentially by default. Stories with no file
-   dependencies may be parallelized at your discretion.
+6. Run the per-story loop sequentially. Each story must pass review
+   before the next story starts.
 7. After all stories: run `TEST_CMD` one final time to catch cross-story
    regressions. If tests fail, dispatch a targeted fix and re-verify.
 8. Report completion status with concerns log.
@@ -127,9 +125,10 @@ For each story i/N:
   2. Implementor implements (codex exec) → commit(s)
   3. Record STORY_HEAD_SHA = current HEAD
   4. Reviewer checks code + spec (Agent, fresh) → verdict
-     PASS → next story
-     PASS_WITH_CONCERNS → record concerns, next story
+     PASS → step 5
+     PASS_WITH_CONCERNS → record concerns → step 5
      FAIL → targeted fix (max 2 rounds) → re-review
+  5. Record cross-story context → next story
 ```
 
 ### Step A: Implement
@@ -139,88 +138,9 @@ Record `STORY_START_SHA`:
 git rev-parse HEAD
 ```
 
-Dispatch codex exec with the Implementor prompt:
-
-```bash
-codex exec "You are implementing story <i>/<N>.
-Your code will be reviewed.
-
-## Story <i>/<N>: <title>
-<full story text from plan.md>
-
-## Acceptance Criteria
-<criteria from spec.md that apply to this story>
-
-## Prior Stories Completed
-<for each prior story: title, files changed, commit range>
-
-## Code Conduct
-<CODE_CONDUCT — extracted conventions for this repo>
-
-Follow these conventions strictly. Deviating from them is a review
-failure even if the code works. If Code Conduct specifies a commit
-message format, use it. Otherwise use Conventional Commits.
-
-## Instructions
-
-Follow the TDD cycle:
-1. Write a failing test that captures the story requirement (Red)
-2. Write the minimal code to make the test pass (Green)
-3. Verify all existing tests still pass: <TEST_CMD>
-4. Commit — this is MANDATORY, do not skip:
-   ```
-   git add -A
-   git commit -m "<type>(<scope>): <description>"
-   ```
-   If you do not run git commit, your work is lost and the story fails.
-
-## Code Organization
-
-- If the plan defines file structure, follow it
-- Each file should have one clear responsibility
-- If a file you are creating is growing beyond the plan's intent, stop and
-  report DONE_WITH_CONCERNS — do not split files on your own
-- If an existing file you are modifying is already large or tangled, work
-  carefully and note it as a concern in your report
-
-## Self-Review Before Committing
-
-Before committing, check your own work:
-
-- **Completeness:** Did you implement every requirement in this story?
-  Any edge cases you missed?
-- **Quality:** Are names clear? Is the code the simplest thing that works?
-- **Discipline:** Did you build ONLY what the story asks? No gold-plating,
-  no unasked-for abstractions?
-- **Testing:** Do your tests verify actual behavior? Would a failing test
-  catch a real regression?
-
-If you find issues, fix them before committing.
-
-## When Stuck
-
-If something is unexpected or unclear, investigate first — read the
-relevant code, check tests, understand context. Do not guess.
-
-STOP and report if:
-- Investigation does not resolve your uncertainty
-- The task requires architectural decisions with multiple valid approaches
-- The story involves restructuring code the plan didn't anticipate
-- The codebase state does not match what the story assumes (e.g. a prior
-  story changed the target file significantly)
-
-Report NEEDS_CONTEXT with what you found, or BLOCKED with what you tried.
-
-## Report Format
-
-End your output with exactly one of these status lines:
-DONE — implemented and committed
-DONE_WITH_CONCERNS — implemented, but: <specific concerns>
-BLOCKED — cannot complete: <what's blocking and what you tried>
-NEEDS_CONTEXT — missing: <specific information needed>
-
-Then list: commit SHA and any concerns." --full-auto
-```
+Dispatch codex exec using the prompt template at `./implementer-prompt.md`.
+Fill all placeholders (story text, acceptance criteria, prior stories,
+CODE_CONDUCT, TEST_CMD) before dispatch. Run with `--full-auto`.
 
 After Implementor returns:
 1. Record `STORY_HEAD_SHA=$(git rev-parse HEAD)`
@@ -233,68 +153,14 @@ After Implementor returns:
 
 ### Step B: Review
 
-Dispatch a fresh Agent with the following prompt:
-
-```
-You are reviewing the changes for story <i>/<N>.
-Review for: code quality, spec compliance, and convention compliance.
-
-## Changes
-
-Run `git diff <STORY_START_SHA>..<STORY_HEAD_SHA>` to see the diff.
-
-## Tests
-
-Run `<TEST_CMD>`. If tests fail, verdict is FAIL regardless of code
-quality or spec compliance.
-
-### Code Quality
-- Is the code clear and maintainable?
-- Are there bugs, logic errors, or obvious edge cases missed?
-- Are tests meaningful (not just testing mocks)?
-
-### Spec Compliance
-- Does the implementation satisfy the story requirements and acceptance
-  criteria below?
-- Did the implementor build anything NOT required by the story?
-  Extra features or scope creep = FAIL.
-
-<relevant acceptance criteria from spec.md>
-
-### Convention Compliance
-Does the code follow the repo's coding conventions?
-
-<CODE_CONDUCT — same conventions given to Implementor>
-
-Check:
-- Naming, error handling, file organization, test patterns
-- If a convention is not documented, check existing code in the same
-  directory for implicit patterns and enforce consistency
-
-Convention violations are FAIL even if the code works correctly.
-
-### Story Requirements
-<full story text from plan.md>
-
-## Verdict
-
-Reply with exactly one of:
-
-PASS — tests pass, spec met, conventions followed. Code can proceed.
-
-PASS_WITH_CONCERNS — code can proceed, but these points need attention
-in later review: <concerns with file:line references>
-
-FAIL — code must not proceed until fixed: <issues, each with:>
-  - What's wrong (quality / spec / convention violation)
-  - Where (file:line)
-  - How to fix it
-```
+Dispatch a fresh Agent using the prompt template at `./reviewer-prompt.md`.
+Fill all placeholders (story number, SHAs, TEST_CMD, spec requirements,
+story text) before dispatch.
 
 After Reviewer returns, read the verdict:
-- **PASS** → record story as complete, move to next story.
-- **PASS_WITH_CONCERNS** → append concerns to `concerns.md` in task dir,
-  move to next story.
+- **PASS** → proceed to Step D.
+- **PASS_WITH_CONCERNS** → append concerns to `concerns.md` (in task dir
+  if one exists, otherwise in the repo root). Proceed to Step D.
 - **FAIL** → proceed to Step C (targeted fix). Max 2 rounds.
   If 2 rounds exhausted and still FAIL → escalate as BLOCKED.
 - **No recognized verdict** → re-dispatch a fresh Reviewer once.
@@ -337,9 +203,7 @@ After fix commits:
 1. Update `STORY_HEAD_SHA=$(git rev-parse HEAD)`
 2. Return to **Step B** with fresh Reviewer using updated commit range.
 
----
-
-## Cross-Story Context
+### Step D: Record Context
 
 After each story completes (PASS or PASS_WITH_CONCERNS), record a summary:
 
@@ -414,14 +278,20 @@ Report one of:
   Include: which story, what failed, what was tried.
 - **NEEDS_CONTEXT** — missing information. Include: what's needed, from whom.
 
-<Bad>
-- Writing code yourself instead of dispatching codex exec (violates separation of concerns)
-- Reading the diff yourself instead of dispatching a fresh Agent reviewer (biases judgment)
-- Running tests yourself instead of letting codex/reviewer handle it
-- Falling back to "I'll just do it myself" when codex is slow or unavailable (report BLOCKED instead)
-- Skipping review because "codex's self-review looked good"
-- Full re-implementation on FAIL instead of targeted fix (wasteful, risky)
-- Letting codex modify tests to make them pass instead of fixing code
-- Retrying after crash without checking HEAD/working tree for partial changes
-- Not using TaskCreate/TaskUpdate to track per-story progress
-</Bad>
+## Red Flags
+
+**Never:**
+- Write code yourself instead of dispatching codex exec
+- Read the diff yourself instead of dispatching a fresh Agent reviewer
+- Run tests yourself instead of letting codex/reviewer handle it
+- Fall back to "I'll just do it myself" when codex is slow or unavailable — report BLOCKED
+- Skip review because "codex's self-review looked good"
+- Start the next story before the current story's review returns a verdict
+- Run multiple implementation dispatches in parallel (file conflicts)
+- Implement directly on main/master without explicit user consent
+- Do a full re-implementation on FAIL instead of a targeted fix
+- Let codex modify tests to make them pass instead of fixing code
+- Accept "close enough" on spec checklist — any ❌ or ⚠️ is FAIL, no exceptions
+- Omit prior stories context from the implementor prompt (causes duplicate work or conflicts)
+- Retry after crash without checking HEAD/working tree for partial changes
+- Skip TaskCreate/TaskUpdate to track per-story progress
