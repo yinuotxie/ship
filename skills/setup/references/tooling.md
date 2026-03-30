@@ -29,10 +29,13 @@ Example:
 
 ```bash
 tmp=$(mktemp) && \
-jq '.quality.pre_commit += ["ruff check .", "ruff format --check ."] | .quality.pre_commit |= unique' \
+jq '.quality.pre_commit += [{"command": "ruff check .", "name": "linter"}, {"command": "ruff format --check .", "name": "formatter"}]' \
   .ship/ship.policy.json > "$tmp" && \
 mv "$tmp" .ship/ship.policy.json
 ```
+
+**Each entry MUST be an object** with `command` and `name` keys. Do NOT use plain strings.
+The `name` should be a human-readable category (e.g. "linter", "formatter", "type checker", "tests").
 
 ### 3. Update AGENTS.md
 

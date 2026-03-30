@@ -137,7 +137,12 @@ Always run this phase for every tier. This is the final phase because
 ### 4.3 Generate `.ship/ship.policy.json` — LAST
 
 - Read [templates/ship.policy.json](templates/ship.policy.json).
-- Fill `quality.pre_commit` with only `ready` tools (including newly installed ones), using actual detected commands.
+- Fill `quality.pre_commit` with only `ready` tools (including newly installed ones).
+  **Each entry MUST be an object** with `command` and `name` keys:
+  ```json
+  {"command": "uv run ruff check .", "name": "linter"}
+  ```
+  Do NOT use plain strings. The enforcement hook reads `.command` and `.name` from each entry.
 - Fill `quality.require_tests` patterns from detected source and test layout.
 - Merge boundaries from the chosen tier and custom boundaries input.
 - If a policy already exists, show a diff and ask for confirmation before overwriting.
